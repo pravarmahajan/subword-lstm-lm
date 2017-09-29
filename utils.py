@@ -61,6 +61,7 @@ class TextLoader:
             self.preprocess()
         else:
             self.load_preprocessed()
+        pass
 
     @staticmethod
     def is_hyperlink(word):
@@ -663,6 +664,12 @@ class TextLoader:
                                             self.ngram_to_id))
             else:
                 sys.exit("Unknown composition")
+
+        if len(_buffer) < self.num_steps:
+            for i in range(self.num_steps-len(_buffer)):
+                _buffer = \
+                        [self.max_ngram_per_word*[self.ngram_to_id['<PAD>']]] \
+                        + _buffer
         return _buffer
 
     def word_to_chars(self, word):
@@ -732,8 +739,10 @@ class TextLoader:
             ys = list()
 
             for j in range(batch_size):
-                x = data[j][i * num_steps:(i + 1) * num_steps]
-                y = data[j][i * num_steps + 1:(i + 1) * num_steps + 1]
+                x = data[j][i * num_steps:(i + 1) * \
+                            num_steps]
+                y = data[j][i * num_steps + 1:(i + 1) * num_steps + \
+                            1]
 
                 xs.append(self.encode_data(x))
                 ys.append(self.data_to_word_ids(y, True))

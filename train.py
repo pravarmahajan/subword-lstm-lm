@@ -41,6 +41,8 @@ def main():
                         help='minibatch size')
     parser.add_argument('--num_steps', type=int, default=20,
                         help='RNN sequence length')
+    parser.add_argument('--bilstm_num_steps', type=int, default=100,
+                        help='Max unroll length')
     parser.add_argument('--out_vocab_size', type=int, default=5000,
                         help='size of output vocabulary')
     parser.add_argument('--num_epochs', type=int, default=50,
@@ -86,7 +88,7 @@ def main():
     train(args)
 
 
-def run_epoch(session, m, data, data_loader, eval_op, verbose=False):
+def run_epoch(session, m, data, data_loader, bilstm_num_steps, eval_op, verbose=False):
     epoch_size = ((len(data) // m.batch_size) - 1) // m.num_steps
     start_time = time.time()
 
@@ -98,7 +100,8 @@ def run_epoch(session, m, data, data_loader, eval_op, verbose=False):
         session.run(m.initial_fw_state)
         session.run(m.initial_bw_state)
 
-    for step, (x, y) in enumerate(data_loader.data_iterator(data, m.batch_size, m.num_steps)):
+    for step, (x, y) in enumerate(data_loader.data_iterator(data, m.batch_size,
+                                                            m.num_steps)):
         cost, state, _ = session.run([m.cost, m.final_state, eval_op],
                                      {m.input_data: x,
                                       m.targets: y,
@@ -153,13 +156,16 @@ def train(args):
         if args.composition == "bi-lstm":
             if args.unit == "char":
                 fout.write("Maximum word length: " + str(data_loader.max_word_len) + "\n")
-                args.bilstm_num_steps = data_loader.max_word_len
+                args.bilstm_num_steps = min(data_loader.max_word_len,
+                                            args.bilstm_num_steps)
             elif args.unit == "char-ngram":
                 fout.write("Maximum ngram per word: " + str(data_loader.max_ngram_per_word) + "\n")
-                args.bilstm_num_steps = data_loader.max_ngram_per_word
+                args.bilstm_num_steps = min(data_loader.max_ngram_per_word,
+                                            args.bilstm_num_steps)
             elif args.unit == "morpheme" or args.unit == "oracle":
                 fout.write("Maximum morpheme per word: " + str(data_loader.max_morph_per_word) + "\n")
-                args.bilstm_num_steps = data_loader.max_morph_per_word
+                args.bilstm_num_steps = min(data_loader.max_morph_per_word,
+                                            args.bilstm_num_steps)
             else:
                 sys.exit("Wrong unit.")
         elif args.composition == "addition":
@@ -171,6 +177,7 @@ def train(args):
         if args.composition != "none":
             sys.exit("Wrong composition.")
 
+    data_loader.max_ngram_per_word = args.bilstm_num_steps
     with open(os.path.join(args.save_dir, 'config.pkl'), 'wb') as f:
         pickle.dump(args, f)
 
@@ -229,8 +236,12 @@ def train(args):
             mtrain.assign_lr(sess, learning_rate)
             print("Learning rate: %.3f" % sess.run(mtrain.lr))
 
-            train_perplexity = run_epoch(sess, mtrain, train_data, data_loader, mtrain.train_op, verbose=True)
-            dev_perplexity = run_epoch(sess, mdev, dev_data, data_loader, tf.no_op())
+            train_perplexity = run_epoch(sess, mtrain, train_data, data_loader,
+                                         args.bilstm_num_steps,
+                                         mtrain.train_op, verbose=True,
+                                         )
+            dev_perplexity = run_epoch(sess, mdev, dev_data, data_loader, 
+                                       args.bilstm_num_steps, tf.no_op())
 
             print("Train Perplexity: %.3f" % train_perplexity)
             print("Valid Perplexity: %.3f" % dev_perplexity)

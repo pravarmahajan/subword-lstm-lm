@@ -9,7 +9,6 @@ import os, sys
 import pickle
 from utils import TextLoader
 from biLSTM import BiLSTMModel
-from charCNN import CharCNN
 from add import AdditiveModel
 from word import WordModel
 
@@ -50,6 +49,7 @@ def test(test_args):
 
     with open(os.path.join(test_args.save_dir, 'config.pkl'), 'rb') as f:
         args = pickle.load(f)
+        print(args)
 
     args.save_dir = test_args.save_dir
     data_loader = TextLoader(args, train=False)
@@ -69,25 +69,9 @@ def test(test_args):
     # Statistics of sub units
     if args.unit != "word":
         print("Subword vocab size: " + str(data_loader.subword_vocab_size))
-        if args.composition == "bi-lstm":
-            if args.unit == "char":
-                args.bilstm_num_steps = data_loader.max_word_len
-                print("Max word length:", data_loader.max_word_len)
-            elif args.unit == "char-ngram":
-                args.bilstm_num_steps = data_loader.max_ngram_per_word
-                print("Max ngrams per word:", data_loader.max_ngram_per_word)
-            elif args.unit == "morpheme" or args.unit == "oracle":
-                args.bilstm_num_steps = data_loader.max_morph_per_word
-                print("Max morphemes per word", data_loader.max_morph_per_word)
 
-    if args.unit == "word":
-        lm_model = WordModel
-    elif args.composition == "addition":
-        lm_model = AdditiveModel
-    elif args.composition == "bi-lstm":
-        lm_model = BiLSTMModel
-    else:
-        sys.exit("Unknown unit or composition.")
+    data_loader.max_ngram_per_word = args.bilstm_num_steps
+    lm_model = BiLSTMModel
 
     print("Begin testing...")
     with tf.Graph().as_default(), tf.Session() as sess:

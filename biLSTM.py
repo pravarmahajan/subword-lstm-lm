@@ -24,6 +24,7 @@ class BiLSTMModel(object):
         out_vocab_size = args.out_vocab_size
         rnn_state_size = rnn_size
         tf_device = "/gpu:" + str(args.gpu)
+        #tf_device = "/cpu:" + str(args.gpu)
 
         if args.unit == 'char':
             subword_dim = args.char_dim
